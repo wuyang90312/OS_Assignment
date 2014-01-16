@@ -100,7 +100,9 @@ void setup(char inputBuffer[], char *args[],int *background, int index)
 				}else{
 					/* once the very first letter is not 'r', we know that the 
 					 * command is not retrieving; therefore, change the value of history*/
-					if (history == 0 || history == 2) history = -1; /*More than 2 letter appearing, invalid case when history = 2 */
+					if (history == 0 || history == 2){ /* More than 2 letter appearing, invalid case when history = 2 */
+						 history = -1;
+					 }
 					else if ( history == 1){ /* if we have first letter as 'r', check the second letter*/
 						history = 2;
 						headL = inputBuffer[i];
@@ -110,7 +112,6 @@ void setup(char inputBuffer[], char *args[],int *background, int index)
 	}
 	args[ct] = NULL; /* just in case the input line was > 80 */
 
-	printf("the headL is %c, the index is %d, the history is %d\n", headL, index, history);
 	/*According to history, we decide whether use history record*/
 	if( history == 1 ){ /* when history = 1, retrieve the newest record*/
 		int ID = (index -1 )% 10; /* once the index is 10, it will take the position of place 0 -- loop */
@@ -119,13 +120,14 @@ void setup(char inputBuffer[], char *args[],int *background, int index)
 			printf("ERROR: There is no record existing\n");
 		}
 		else{
-			printf("hello\n");
 			/*Copy the most recent data*/
 			strcpy(args, record[ID].args);
 			strcpy(inputBuffer, record[ID].inputBuffer);
 		}
 	}else if( history == 2 ){ /* when history = 2, check the first letter of args */
 		
+	}else{
+		printf("Now the args is %s, the process is %d", args[1], getpid());
 	}
 }
 
@@ -159,11 +161,13 @@ int main(void)
 		}
 		/* If fid is positive, it is parent process */
 		else if(fid > 0){
+			pid_t	tpid;
+			
 			/* Here check the background to see if we need to wait the child process to finish */
 			if(background == 0){ /* when background = 0, parent process does its own work -- run cocurrently */
-
+				tpid = wait(&status); /* get the status of child process by using wait()*/
 			}else{ /* otherwise, parent process waits for child process */
-				pid_t tpid ;
+
 				/* keep the while loop running when child signal is not terminated */
 				do {
 				   tpid = wait(&status);
@@ -184,7 +188,7 @@ int main(void)
 		otherwise returns to the setup() function. */
 		
 		/* Use the status to check if the child process has a valid shell argument */
-		if(status > 0 ){ /* only when status > 0, the child run successfully*/
+		if(status == 0){ /* only when status == 0, the child run successfully*/
 			takenRecord(index, args, inputBuffer);/*After the command line was taken down, put it into histroy*/
 			index++; /*everytime a command line is passed, the index is incremented*/
 		}
