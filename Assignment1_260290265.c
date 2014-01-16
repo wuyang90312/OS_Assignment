@@ -145,9 +145,6 @@ int main(void)
 		
 		setup(inputBuffer, args, &background, index); /* get next command */
 
-		takenRecord(index, args, inputBuffer);/*After the command line was taken down, put it into histroy*/
-		index++; /*everytime a command line is passed, the index is incremented*/
-
 		/* Invoke a fork process */
 		fid = fork();
 		/* If fid is zero, it is child process */
@@ -185,6 +182,12 @@ int main(void)
 		(2) the child process will invoke execvp()
 		(3) if background == 1, the parent will wait,
 		otherwise returns to the setup() function. */
+		
+		/* Use the status to check if the child process has a valid shell argument */
+		if(status > 0 ){ /* only when status > 0, the child run successfully*/
+			takenRecord(index, args, inputBuffer);/*After the command line was taken down, put it into histroy*/
+			index++; /*everytime a command line is passed, the index is incremented*/
+		}
 	}
 }
 
