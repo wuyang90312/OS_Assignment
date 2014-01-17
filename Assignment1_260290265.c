@@ -21,6 +21,7 @@ typedef struct{
 **/
 
 void takenRecord(int index, char* args[], char inputBuffer[]);
+int recordWLetter(int index, char letter);
 
 /*****************************************************************************************
 *
@@ -76,12 +77,6 @@ void setup(char inputBuffer[], char *args[],int *background, int index)
 				start = -1;
 			break;
 
-			/*If there is no other than space in front of 'r', continue */
-			case 'r':
-				if(history == 0){
-					history = 1;
-				}
-
 			case '\n': /* should be the final char examined */
 				if (start != -1){
 					args[ct] = &inputBuffer[start];
@@ -100,7 +95,10 @@ void setup(char inputBuffer[], char *args[],int *background, int index)
 				}else{
 					/* once the very first letter is not 'r', we know that the 
 					 * command is not retrieving; therefore, change the value of history*/
-					if (history == 0 || history == 2){ /* More than 2 letter appearing, invalid case when history = 2 */
+					if(inputBuffer[i] == 'r' && history == 0 ){ /*If there is no other than space in front of 'r', continue */
+						history = 1;
+					}
+					else if (history == 0 || history == 2){ /* More than 2 letter appearing, invalid case when history = 2 */
 						 history = -1;
 					 }
 					else if ( history == 1){ /* if we have first letter as 'r', check the second letter*/
@@ -125,10 +123,18 @@ void setup(char inputBuffer[], char *args[],int *background, int index)
 			strcpy(inputBuffer, record[ID].inputBuffer);
 		}
 	}else if( history == 2 ){ /* when history = 2, check the first letter of args */
-		
-	}else{
-		printf("Now the args is %s, the process is %d", args[1], getpid());
+		/* if the function returns zero, error occurs or no fitting command existing*/
+		if(recordWLetter(index, headL)==0){
+			
+		}else{
+			
+		}
 	}
+}
+
+int recordWLetter(int index, char letter)
+{
+	
 }
 
 int main(void)
