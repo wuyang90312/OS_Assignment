@@ -22,7 +22,11 @@ typedef struct{
 
 void takenRecord(int index, char* args[], char inputBuffer[]);
 int recordWLetter(int index, int *position, char letter);
+<<<<<<< HEAD
 void positionCalculation(char* args[], char* argss[], char* input);
+=======
+void positionCalculation(char* args[], char* argss[], int offset);
+>>>>>>> e76272585bb71c2fe746a3f84acd6f09a0017851
 
 /*****************************************************************************************
 *
@@ -46,7 +50,12 @@ void setup(char inputBuffer[], char *args[],int *background, int index)
 		start, /* index where beginning of next command parameter is */
 		ct, /* index of where to place the next parameter into args[] */
 		history; /* indication of whether the command is asking to retrieve history*/
+<<<<<<< HEAD
 	int ID = (index -1 )% 10; /* once the index is 10, it will take the position of place 0 -- loop */
+=======
+
+	int ID;
+>>>>>>> e76272585bb71c2fe746a3f84acd6f09a0017851
 	char headL;
 
 	history = 0;/* when the result of history is (-1||0)/1/2, the corresponding 
@@ -55,7 +64,7 @@ void setup(char inputBuffer[], char *args[],int *background, int index)
 
 	/* read what the user enters on the command line */
 	length = read(STDIN_FILENO, inputBuffer, MAX_LINE);
-
+	
 	start = -1;
 	if (length == 0)
 		exit(0); /* ^d was entered, end of user command stream */
@@ -63,7 +72,7 @@ void setup(char inputBuffer[], char *args[],int *background, int index)
 		perror("error reading the command");
 		exit(-1); /* terminate with error code of -1 */
 	}
-	
+
 	/* examine every character in the inputBuffer */
 	for (i=0;i<length;i++) {
 		switch (inputBuffer[i]){
@@ -111,15 +120,23 @@ void setup(char inputBuffer[], char *args[],int *background, int index)
 	}
 	args[ct] = NULL; /* just in case the input line was > 80 */
 
+<<<<<<< HEAD
 
 	/*According to history, we decide whether use history record*/
 	if( history == 1 ){ /* when history = 1, retrieve the newest record*/
 		
+=======
+	ID = (index -1 )% 10; /* once the index is 10, it will take the position of place 0 -- loop */
+printf("the headL is %c, the index is %d, the history is %d, the factor 1 is %s, factor 2 is %s\n", headL, index, history, record[ID].args[0],record[ID].args[1]);
+	/*According to history, we decide whether use history record*/
+	if( history == 1 ){ /* when history = 1, retrieve the newest record*/
+>>>>>>> e76272585bb71c2fe746a3f84acd6f09a0017851
 		if(ID < 0){
 			printf("ERROR: There is no record existing\n");
 		}
 		else{
 			/*Copy the most recent data*/
+<<<<<<< HEAD
 			memcpy(inputBuffer, record[ID].inputBuffer, MAX_LINE);
 			positionCalculation( record[ID].args, args, &inputBuffer[0]); /* calculate new memory location*/
 		}
@@ -149,6 +166,41 @@ int recordWLetter(int index, int *position, char letter)
         }
 
         return 0;
+=======
+			//memcpy(args, record[ID].args, MAX_LINE);
+			//int offset = (&inputBuffer[0]) - (&record[ID].inputBuffer[0]); /* offset between two addesses*/
+			//positionCalculation( record[ID].args, args, offset); /* calculate new memory location*/
+		}
+	}else if( history == 2 ){ /* when history = 2, check the first letter of args */
+
+		if(recordWLetter(index, &ID, headL)){ /* if the function returns positive number, no error occurs */
+
+			//memcpy(args, record[ID].args, MAX_LINE);
+			//int offset = (&inputBuffer[0]) - (&record[ID].inputBuffer[0]); /* offset between two addesses*/
+			//positionCalculation( record[ID].args, args, offset); /* calculate new memory location*/
+		} 
+
+	}
+}
+
+/* This function is designed for checking the right */
+int recordWLetter(int index, int *position, char letter)
+{
+	int counter; /* allocate a counter to count up to 10 */
+	counter = 0;
+
+	while(index >= 0){ /* if the index is running out of limit, stop while loop and return fault */
+		*position = (index - counter) % 10;
+		if(counter >9){ /* if all of the 10 array indices have been run, return fault*/
+			return 0;
+		}else if( record[*position].inputBuffer[0] = letter){
+			return 1;
+		}
+		counter ++;
+	}
+
+	return 0;
+>>>>>>> e76272585bb71c2fe746a3f84acd6f09a0017851
 }
 
 int main(void)
@@ -160,35 +212,36 @@ int main(void)
 	static int index; /* take record of how many command lines have been passed to the terminal*/
 
 	index = 0;
+	status = 1;
 
 	while (1){ /* Program terminates normally inside setup */
 		background = 0;
 		printf(" COMMAND->\n");
-		
+
 		setup(inputBuffer, args, &background, index); /* get next command */
 
 		/* Invoke a fork process */
 		fid = fork();
 		/* If fid is zero, it is child process */
 		if(fid == 0){
+<<<<<<< HEAD
 
+=======
+printf("the input is %s, %s, %d\n", inputBuffer, args[1], getpid());
+>>>>>>> e76272585bb71c2fe746a3f84acd6f09a0017851
 			/* Test if the statement is valid, otherwise show the error message */
-			if(execvp(inputBuffer, args) == -1){
-				printf("ERROE: The Command line is invalid\n");
-				exit(-1);
-			}else{/* After the process finished, kill it*/
-				exit(0);
-			}
+			execvp(inputBuffer, args);
+			exit(0);
 		}
 		/* If fid is positive, it is parent process */
 		else if(fid > 0){
 			pid_t	tpid;
-			
+printf("start to enter parent loop;\n");
 			/* Here check the background to see if we need to wait the child process to finish */
 			if(background == 0){ /* when background = 0, parent process does its own work -- run cocurrently */
 				tpid = wait(&status); /* get the status of child process by using wait()*/
+				printf("in parent, pid is %d, child is %d", getpid(), tpid);
 			}else{ /* otherwise, parent process waits for child process */
-
 				/* keep the while loop running when child signal is not terminated */
 				do {
 				   tpid = wait(&status);
@@ -208,16 +261,24 @@ int main(void)
 		(3) if background == 1, the parent will wait,
 		otherwise returns to the setup() function. */
 
+<<<<<<< HEAD
+=======
+	printf("the status is %d", status);
+>>>>>>> e76272585bb71c2fe746a3f84acd6f09a0017851
 		/* Use the status to check if the child process has a valid shell argument */
 		if(status == 0){ /* only when status == 0, the child run successfully*/
 			takenRecord(index, args, inputBuffer);/*After the command line was taken down, put it into histroy*/
 			index++; /*everytime a command line is passed, the index is incremented*/
+		}else{
+			printf("ERROE: The Command line is invalid\n");
 		}
 	}
+
 }
 
 void takenRecord(int index, char* args[],char inputBuffer[])
 {
+<<<<<<< HEAD
 	 int ID = index % 10; /* once the index is 10, it will take the position of place 0 -- loop */
 	
         /* the record take down all of the values of its variables*/
@@ -239,4 +300,26 @@ void positionCalculation(char* args[], char* argss[], char* input)
                 printf("the position is %d, the factor 1 is %s, factor 2 is %s\n", position, args[position],argss[position]);
                 position ++;
         }while(args[position] != '\0');
+=======
+	int ID = index % 10; /* once the index is 10, it will take the position of place 0 -- loop */
+	/* the record take down all of the values of its variables*/
+	record[ID].index = index;
+	memcpy(record[ID].inputBuffer, inputBuffer, MAX_LINE); /* duplicate inputBUffer*/
+
+	int offset = (&record[ID].inputBuffer[0])  - (&inputBuffer[0]) ; /* offset between two addesses*/
+	positionCalculation( args, record[ID].args, offset); /* calculate new memory location*/
+	printf(" the factor 1 is %s, factor 2 is %s\n", record[ID].args[0],record[ID].args[1]);
+}
+
+void positionCalculation(char* args[], char* argss[], int offset)
+{
+	/* since a new char array is created, it is allocated to a new memory location
+	 *  reassign its location to record[].args*/
+	int position = 0;
+	while(args[position] != '\0'){
+		argss[position] =  args[position] + offset;
+		position ++;
+	}
+	argss[position+1] = args[position+1] + offset; /* Take down the last null*/
+>>>>>>> e76272585bb71c2fe746a3f84acd6f09a0017851
 }
