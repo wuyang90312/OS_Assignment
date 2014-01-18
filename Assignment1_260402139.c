@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <string.h>
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
 /**
 * setup() reads in the next command line, separating it into distinct tokens
@@ -10,6 +11,10 @@
 * null-terminated string.
 */
 static int length;
+static int error = 0;
+static int q = 0; // index for history array
+static char* history[50][MAX_LINE];
+static RFlag = 0;
 void setup(char inputBuffer[], char *args[],int *background){
 	//int length, /* # of characters in the command line */
 		int i, /* loop index for accessing inputBuffer array */
@@ -17,23 +22,23 @@ void setup(char inputBuffer[], char *args[],int *background){
 		ct; /* index of where to place the next parameter into args[] */
 	ct = 0;
 
-//Need link list or a huge array.
 
-	// char history[];
-	// if(history.length == 0){
-	// 	history = inputBuffer;
-	// }else{
-	// 	int i = history.length;
-	// 	for(int k = 0; k < inputBuffer.length ; k++){
-	// 		history[i+k] = inputBuffer[k];	// store all the past history of command
-	// 	}
-	// }
-	// printf("History:\n");
-	// for(int j = 0; j < history.length ; j++){
-	// 	printf("%c\n",history[j] );
-	// }
+	int s = 0;
+	for(s; s < length; s++){
+		//printf("%s \n",args[s]);
+		history[q][s] = args[s];
+		printf("History : %s\n",history[q][s] );
+		//printf("%s\n",inputBuffer );
+	}
+	 // 
+
+	// need to test the 2D array
 
 
+
+	
+
+	//printf("History:  %s\n", inputBuffer);
 /* read what the user enters on the command line */
 	length = read(STDIN_FILENO, inputBuffer, MAX_LINE); 
 	start = -1;
@@ -46,6 +51,9 @@ void setup(char inputBuffer[], char *args[],int *background){
 /* examine every character in the inputBuffer */
 		for (i=0;i<length;i++) { 
 			switch (inputBuffer[i]){
+				case'r':
+					RFlag = 1;
+				break;
 				case ' ':
 				case '\t' :    /* argument separators */
 					if(start != -1){
@@ -88,16 +96,28 @@ int main(void){
 
 	while (1){    /* Program terminates normally inside setup */
 	//printf("REPEAT\n");
+		q++;
 		background = 0;	
 		
 		printf(" COMMAND->\n");
 		setup(inputBuffer,args,&background); /* get next command */
-		int s = 0;
-		for(s; s < length; s++){
-			printf("%s \n",args[s]);
-		}
+		// int s = 0;
+		// for(s; s < length; s++){
+		// 	printf("%s \n",args[s]);
+		// }
 		childPID = fork(); //(1) fork a child process using fork()
 		//printf("childPID = %d \n",childPID);
+
+
+		// if(RFlag == 1){
+		// 	RFlag = 0;
+		// 	//execvp(history[q-1][0],history[q-1]);
+		// 	printf("Worng Command\n");
+		// 	exit(0);
+		// }
+
+
+
 /* the steps are:
 
 (2) the child process will invoke execvp()
@@ -110,6 +130,9 @@ otherwise returns to the setup() function. */
 		}
 		else if(childPID == 0 ){
 			//printf("IN Child\n");
+			if(execvp(args[0], args) == -1){
+				error = -1;
+			}
 			execvp(args[0], args);
 			printf("Worng Command\n");
 			exit(0);
