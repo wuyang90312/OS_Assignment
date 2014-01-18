@@ -139,7 +139,7 @@ int recordWLetter(int index, int *position, char letter)
         counter = 0;
 
         while(index >= 0){ /* if the index is running out of limit, stop while loop and return fault */
-                *position = (index - counter) % 10;
+                *position = (index - counter-1) % 10;
                 if(counter >9){ /* if all of the 10 array indices have been run, return fault*/
                         return 0;
                 }else if( record[*position].inputBuffer[0] == letter){
@@ -219,24 +219,23 @@ int main(void)
 void takenRecord(int index, char* args[],char inputBuffer[])
 {
 	 int ID = index % 10; /* once the index is 10, it will take the position of place 0 -- loop */
-	
-        /* the record take down all of the values of its variables*/
-        record[ID].index = index;
-        memcpy(record[ID].inputBuffer, inputBuffer, MAX_LINE); /* duplicate inputBUffer*/
 
-        positionCalculation( args, record[ID].args, &record[ID].inputBuffer[0]); /* calculate new memory location*/
+		/* the record take down all of the values of its variables*/
+		record[ID].index = index;
+		memcpy(record[ID].inputBuffer, inputBuffer, MAX_LINE); /* duplicate inputBUffer*/
+		positionCalculation( args, record[ID].args, &record[ID].inputBuffer[0]); /* calculate new memory location*/
 }
 
 void positionCalculation(char* args[], char* argss[], char* input)
 {
-        /* since a new char array is created, it is allocated to a new memory location
-         *  reassign its location to record[].args*/
-        int position = 0;
-        int offset = 0;
-        do{
-                offset += (!position) ? 0 : (args[position] - args[position-1]);
-                argss[position] = input + offset;
-                printf("the position is %d, the factor 1 is %s, factor 2 is %s\n", position, args[position],argss[position]);
-                position ++;
-        }while(args[position] != '\0');
+		/* since a new char array is created, it is allocated to a new memory location
+		*  reassign its location to record[].args*/
+		int position = 0;
+		int offset = 0;
+		do{
+				offset += (!position) ? 0 : (args[position] - args[position-1]);
+				argss[position] = input + offset;
+				position ++;
+		}while(args[position] != '\0');
+		argss[position] = 0;
 }
