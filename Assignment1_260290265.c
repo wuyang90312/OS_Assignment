@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <signal.h>
 #include <unistd.h>
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
 
@@ -29,7 +30,7 @@ void positionCalculation(char* args[], char* argss[], char* input);
 *Declare a global variable of history, so all function can access it -- either read or write
 *
 **/
-history record[10];
+static history record[10];
 /*****************************************************************************************/
 
 /**
@@ -151,8 +152,30 @@ int recordWLetter(int index, int *position, char letter)
 		return 0;
 }
 
+/* handle the ctrl-C */
+void handle_SIGINT() {
+	/* Do nothing when ctrl-c is signalled */
+	fprintf( stderr, "\n");
+}
+
+/* handle the ctrl-Z */
+void handle_SIGTSTP() {
+
+}
+
 int main(void)
 {
+/********************************************************************************************************
+** set up the signal handler */
+	//struct sigaction handler;
+	//handler.sa_handler = handle_SIGINT;
+	//sigaction(SIGINT, &handler, NULL);
+	//handler.sa_handler = handle_SIGTSTP;
+	//sigaction(SIGTSTP, &handler, NULL);
+	if (signal(SIGINT, SIG_IGN) != SIG_IGN)
+		signal(SIGINT, handle_SIGINT);
+/*********************************************************************************************************/
+
 	char inputBuffer[MAX_LINE]; /* buffer to hold the command entered */
 	int background,status,flag; /* equals 1 if a command is followed by '&'; status to decide the child status */
 	char *args[MAX_LINE/+1]; /* command line (of 80) has max of 40 arguments */
@@ -171,6 +194,9 @@ int main(void)
 		}
 		/* Use the status to check if the child process has a valid shell argument */
 		if(status == 0 && flag){ /* only when status == 0, the child run successfully*/
+			if(!strcmp(inputBuffer,"exit")){ // If the input has only exit, end child process
+				exit(0);
+			}
 			takenRecord(index, args, inputBuffer);/*After the command line was taken down, put it into histroy*/
 			index++; /*everytime a command line is passed, the index is incremented*/
 		}else{
@@ -183,9 +209,16 @@ int main(void)
 		fid = fork();
 		/* If fid is zero, it is child process */
 		if(fid == 0){
-
+			if(!strcmp(inputBuffer,"exit") && args[1] == NULL){ /* If the input has only exit, end child process */
+				exit(0);
+			}
+			else if(!strcmp(inputBuffer,"cd") && args[2] == NULL){ /* If the input has cd and the directory, go to the directory
+			and then end the process */
+				int ret = chdir(args[1]); /* when the directory is wrong, ret = -1 */
+				exit(ret);
+			}
 			/* Test if the statement is valid, otherwise show the error message */
-			if(execvp(inputBuffer, args) == -1){
+			else if(execvp(inputBuffer, args) == -1){
 				printf("ERROE: The Command line is invalid\n");
 				exit(-1);
 			}else{/* After the process finished, kill it*/
@@ -203,9 +236,9 @@ int main(void)
 
 				/* keep the while loop running when child signal is not terminated */
 				do {
-				   tpid = wait(&status);
-				   if(tpid != fid) kill(tpid,0);
-				 } while(tpid != fid);
+					tpid = wait(&status);
+					if(tpid != fid) kill(tpid,0);
+				} while(tpid != fid);
 			}
 		}
 		/* otherwise, forking fails */
