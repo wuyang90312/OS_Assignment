@@ -136,35 +136,47 @@ void setup(char inputBuffer[], char *args[],int *background, int index)
 int recordWLetter(int index, int *position, char letter)
 {
 	int counter; /* allocate a counter to count up to 10 */
-        counter = 0;
+		counter = 0;
 
-        while(index >= 0){ /* if the index is running out of limit, stop while loop and return fault */
-                *position = (index - counter-1) % 10;
-                if(counter >9){ /* if all of the 10 array indices have been run, return fault*/
-                        return 0;
-                }else if( record[*position].inputBuffer[0] == letter){
-                        return 1;
-                }
-                counter ++;
-        }
+		while(index >= 0){ /* if the index is running out of limit, stop while loop and return fault */
+				*position = (index - counter-1) % 10;
+				if(counter >9){ /* if all of the 10 array indices have been run, return fault*/
+						return 0;
+				}else if( record[*position].inputBuffer[0] == letter){
+						return 1;
+				}
+				counter ++;
+		}
 
-        return 0;
+		return 0;
 }
 
 int main(void)
 {
 	char inputBuffer[MAX_LINE]; /* buffer to hold the command entered */
-	int background,status; /* equals 1 if a command is followed by '&'; status to decide the child status */
+	int background,status,flag; /* equals 1 if a command is followed by '&'; status to decide the child status */
 	char *args[MAX_LINE/+1]; /* command line (of 80) has max of 40 arguments */
 	pid_t fid; /* fid to recognize the parent/child process */
 	static int index; /* take record of how many command lines have been passed to the terminal*/
 
 	index = 0;
+	flag = 0; /*Designed to avoid the calling of recording when first time enter */
 
 	while (1){ /* Program terminates normally inside setup */
 		background = 0;
 		printf(" COMMAND->\n");
-		
+
+		if(background == 1){/*check if parent did not wait for child to finish*/
+			wait(&status); /* get the status of child process by using wait()*/
+		}
+		/* Use the status to check if the child process has a valid shell argument */
+		if(status == 0 && flag){ /* only when status == 0, the child run successfully*/
+			takenRecord(index, args, inputBuffer);/*After the command line was taken down, put it into histroy*/
+			index++; /*everytime a command line is passed, the index is incremented*/
+		}else{
+			flag = 1;
+		}
+
 		setup(inputBuffer, args, &background, index); /* get next command */
 
 		/* Invoke a fork process */
@@ -185,8 +197,8 @@ int main(void)
 			pid_t	tpid;
 			
 			/* Here check the background to see if we need to wait the child process to finish */
-			if(background == 0){ /* when background = 0, parent process does its own work -- run cocurrently */
-				tpid = wait(&status); /* get the status of child process by using wait()*/
+			if(background){ /* when background = 0, parent process does its own work -- run cocurrently */
+				//tpid = wait(&status); /* get the status of child process by using wait()*/
 			}else{ /* otherwise, parent process waits for child process */
 
 				/* keep the while loop running when child signal is not terminated */
@@ -207,12 +219,6 @@ int main(void)
 		(2) the child process will invoke execvp()
 		(3) if background == 1, the parent will wait,
 		otherwise returns to the setup() function. */
-
-		/* Use the status to check if the child process has a valid shell argument */
-		if(status == 0){ /* only when status == 0, the child run successfully*/
-			takenRecord(index, args, inputBuffer);/*After the command line was taken down, put it into histroy*/
-			index++; /*everytime a command line is passed, the index is incremented*/
-		}
 	}
 }
 
@@ -233,9 +239,9 @@ void positionCalculation(char* args[], char* argss[], char* input)
 		int position = 0;
 		int offset = 0;
 		do{
-				offset += (!position) ? 0 : (args[position] - args[position-1]);
-				argss[position] = input + offset;
-				position ++;
+			offset += (!position) ? 0 : (args[position] - args[position-1]);
+			argss[position] = input + offset;
+			position ++;
 		}while(args[position] != '\0');
 		argss[position] = 0;
 }
