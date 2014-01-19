@@ -23,7 +23,8 @@ typedef struct history{
 typedef struct jobs{
 	int    index;
 	pid_t  pid;
-	history *record;
+	char *args[MAX_LINE/+1];
+	char inputBuffer[MAX_LINE];
 	struct job *last;
 	struct job *next;
 }jobs;
@@ -45,7 +46,7 @@ void positionCalculation(char* args[], char* argss[], char* input);
 **/
 static history record[RECORD_LIMIT];
 static history History[HISTORY_LIMIT]; /* take down the most recent 30 commands*/
-static jobs job[BG_LIMIT];
+static jobs job[BG_LIMIT]; /* Maximum take 5 records of background running programs*/
 static int childID, flagZ;
 /*****************************************************************************************/
 
@@ -196,15 +197,16 @@ int main(void)
 /*********************************************************************************************************/
 
 	char inputBuffer[MAX_LINE]; /* buffer to hold the command entered */
-	int background,status; /* equals 1 if a command is followed by '&'; status to decide the child status */
+	int background,status, flag; /* equals 1 if a command is followed by '&'; status to decide the child status */
 	char *args[MAX_LINE/+1]; /* command line (of 80) has max of 40 arguments */
 	pid_t fid; /* fid to recognize the parent/child process */
 	static int index; /* take record of how many command lines have been passed to the terminal*/
 	int Hindex = 0; /* History index */
 	jobs* MostRecent;
 
+	flag = 0;
 /**********************************************************************************************************
- * Set up a loop */
+ * Set up a loop link-list */
 	int a;
 	job[0].last = &job[4];
 	job[0].next = &job[1];
@@ -215,10 +217,7 @@ int main(void)
 	job[4].last = &job[3];
 	job[4].next = &job[0];
 	MostRecent = &job[0];
-/*
-	for(a = 0; a <BG_LIMIT; a++){
-		printf("%d : the last address is %x, the present address is %x,the next address is %x\n",a,  job[a].last, &job[a], job[a].next);
-	}*/
+
 /*********************************************************************************************************/
 
 	index = 0;
@@ -235,7 +234,6 @@ int main(void)
 		fid = fork();
 		/* If fid is zero, it is child process */
 		if(fid == 0){
-printf("The child process %d \n", getpid());
 			if(!strcmp(inputBuffer,"exit") && args[1] == NULL){ /* If the input has only exit, end child process */
 				exit(0);
 			}
@@ -245,7 +243,36 @@ printf("The child process %d \n", getpid());
 				exit(ret);
 			}
 			else if(!strcmp(inputBuffer,"jobs") && args[2] == NULL){
-				
+				jobs* position = MostRecent->next;
+				int a;
+				/*check if the background process still exit*/
+				for(a =0; a<BG_LIMIT; a++){
+					if(position->pid){
+						printf("%d.  ", position->index);
+						int i =0;
+						while(position->args[i]!= NULL){
+							printf("%s ",position->args[i]);
+							i++;
+						}
+						printf("    running\n");
+					}
+					position = position->next;
+				}
+			}
+			else if(!strcmp(inputBuffer,"fg")&& args[2] == NULL){ /* Run the most recent bg*/
+				jobs* pt;
+				pt = MostRecent;
+				//printf("the %d   %s", pt->pid, pt->args[0]);
+				while(!pt->pid){
+					pt = pt->last;
+				}
+				printf("%d.  ", pt->index);
+				int i =0;
+				while(MostRecent->args[i]!= NULL){
+					printf("%s ",pt->args[i]);
+					i++;
+				}
+				printf("    running\n");
 			}
 			else if(!strcmp(inputBuffer,"history") && args[1] == NULL){
 				int i;
@@ -277,10 +304,22 @@ printf("The child process %d \n", getpid());
 			
 			/* Here check the background to see if we need to wait the child process to finish */
 			if(background){ /* when background = 1, parent process does its own work -- run cocurrently */
-				MostRecent = MostRecent->next; /* set the MostRecent to next position*/
-				MostRecent->pid = fid; /* STORE the command into job */
+				if(strcmp(inputBuffer,"fg")){
+					MostRecent = MostRecent->next; /* set the MostRecent to next position*/
+					MostRecent->pid = fid; /* STORE the command into job */
+					memcpy(MostRecent->inputBuffer, inputBuffer, MAX_LINE); /* duplicate inputBUffer*/
+					positionCalculation( args, MostRecent->args, &MostRecent->inputBuffer[0]); /* calculate new memory location*/
+					if(flag<5)flag++;
+				}
 			}else{ /* otherwise, parent process waits for child process */
-
+				if(!strcmp(inputBuffer,"fg")){/* once command is "fg", change the pid to the stored pid in struct */
+					jobs* pt;
+					pt = MostRecent;
+					while(!pt->pid){
+						pt = pt->next;
+					}
+					fid = pt->pid;
+				}
 				/* wait untill when child signal is not terminated */
 				do {
 					tpid = waitpid(fid, &status, WSTOPPED);
@@ -289,8 +328,14 @@ printf("The child process %d \n", getpid());
 				if(flagZ) {
 					kill(fid, SIGCONT); /* Resume the child process at background*/
 					flagZ = 0;
-					MostRecent = MostRecent->next; /* set the MostRecent to next position*/
-					MostRecent->pid = fid; /* STORE the command into job */
+					if(strcmp(inputBuffer,"fg"))
+					{
+						MostRecent = MostRecent->next; /* set the MostRecent to next position*/
+						MostRecent->pid = fid; /* STORE the command into job */
+						memcpy(MostRecent->inputBuffer, inputBuffer, MAX_LINE); /* duplicate inputBUffer*/
+						positionCalculation( args, MostRecent->args, &MostRecent->inputBuffer[0]); /* calculate new memory location*/
+						if(flag<5)flag++;
+					}
 				}
 			}
 		}
@@ -311,18 +356,34 @@ printf("The child process %d \n", getpid());
 		jobs* position = MostRecent;
 		/*check if the background process still exit*/
 		for(a =0; a<BG_LIMIT; a++){
-			position = position->last;
-printf("The position is %x \n", position);
-			printf("enter if statement with %d \n", waitpid(position->pid, &status, WNOHANG));
+			position = position->next;
+			//printf("The memory addres is %x, flag is %d, %s the status is %d \n", position,flag, position->args[1],waitpid(position->pid, &status, WNOHANG));
 			if(!waitpid(position->pid, &status, WNOHANG) && position->pid != 0)
 			{
 				position->index = num;
-				printf("The index is %d, The process %d is going\n",position->index, position->pid);
+				//printf("The index is %d, The process %d, input is %s  %s\n",position->index, position->pid,position->args[0], position->args[1]);
 				num++;
-			}else{
-				printf("The process %d has been end\n", position->pid);
+			}
+			else{
+				if(position->pid != 0)flag--;
+				//printf("The process %d has been end\n", position->pid);
 				position->pid = 0;
-				//position->index = 0;
+				jobs* last;
+				jobs* next;
+				last = position->last;
+				next = position->next;
+				/*If the last and next indices both have storages, link the last and next together*/
+				if(last->pid!=0 && next->pid!=0 && flag < 4){
+					/* put the empty cell to the Most Recent location for next term*/
+					jobs* mostRecentNext;
+					mostRecentNext = MostRecent->next;
+					last->next = next;
+					next->last = last;
+					position->next = mostRecentNext;
+					position->last = MostRecent;
+					MostRecent->next = position;
+					mostRecentNext->last = position;
+				}
 			}
 		}
 
