@@ -1,27 +1,40 @@
 #include <stdio.h>
 #include <signal.h>
 #include <unistd.h>
+#include <sys/wait.h>
+
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
+#define HISTORY_LIMIT 20
+#define RECORD_LIMIT 10
+#define BG_LIMIT 5
 
 /**
 *
 * Define a struct type, which can store all of the necessary history information
 * 
 *****************************************************************************************/
-typedef struct{
+typedef struct history{
 	int index;
 	char *args[MAX_LINE/+1];
 	char inputBuffer[MAX_LINE];
 }history;
-// TODO: Add a read/write protection on struct
-// TODO: enable the front space recognition
+
+/* Define another struct to take record of background process */
+typedef struct jobs{
+	int    index;
+	pid_t  pid;
+	history *record;
+	struct job *last;
+	struct job *next;
+}jobs;
+// TODO: reset the history
 /*****************************************************************************************
 *
 *Declare the function
 *
 **/
 
-void takenRecord(int index, char* args[], char inputBuffer[]);
+void takenRecord(int index, char* args[], char inputBuffer[], history record[], int limit);
 int recordWLetter(int index, int *position, char letter);
 void positionCalculation(char* args[], char* argss[], char* input);
 
@@ -30,7 +43,10 @@ void positionCalculation(char* args[], char* argss[], char* input);
 *Declare a global variable of history, so all function can access it -- either read or write
 *
 **/
-static history record[10];
+static history record[RECORD_LIMIT];
+static history History[HISTORY_LIMIT]; /* take down the most recent 30 commands*/
+static jobs job[BG_LIMIT];
+static int childID, flagZ;
 /*****************************************************************************************/
 
 /**
@@ -47,7 +63,7 @@ void setup(char inputBuffer[], char *args[],int *background, int index)
 		start, /* index where beginning of next command parameter is */
 		ct, /* index of where to place the next parameter into args[] */
 		history; /* indication of whether the command is asking to retrieve history*/
-	int ID = (index -1 )% 10; /* once the index is 10, it will take the position of place 0 -- loop */
+	int ID = (index -1 )% RECORD_LIMIT; /* once the index is 10, it will take the position of place 0 -- loop */
 	char headL;
 
 	history = 0;/* when the result of history is (-1||0)/1/2, the corresponding 
@@ -140,7 +156,7 @@ int recordWLetter(int index, int *position, char letter)
 		counter = 0;
 
 		while(index >= 0){ /* if the index is running out of limit, stop while loop and return fault */
-				*position = (index - counter-1) % 10;
+				*position = (index - counter-1) % RECORD_LIMIT;
 				if(counter >9){ /* if all of the 10 array indices have been run, return fault*/
 						return 0;
 				}else if( record[*position].inputBuffer[0] == letter){
@@ -156,59 +172,70 @@ int recordWLetter(int index, int *position, char letter)
 void handle_SIGINT() {
 	/* Do nothing when ctrl-c is signalled */
 	fprintf( stderr, "\n");
+	exit(0);
 }
 
 /* handle the ctrl-Z */
 void handle_SIGTSTP() {
-
+	fprintf( stderr, "\n");
+	flagZ = 1;
+	kill(childID, SIGSTOP);
+	//kill(childID, SIGCONT);
 }
 
 int main(void)
 {
 /********************************************************************************************************
 ** set up the signal handler */
-	//struct sigaction handler;
-	//handler.sa_handler = handle_SIGINT;
-	//sigaction(SIGINT, &handler, NULL);
-	//handler.sa_handler = handle_SIGTSTP;
-	//sigaction(SIGTSTP, &handler, NULL);
-	if (signal(SIGINT, SIG_IGN) != SIG_IGN)
+	if (signal(SIGINT, SIG_IGN) != SIG_IGN) /*Disable the Ctrl-C*/
 		signal(SIGINT, handle_SIGINT);
+	if (signal(SIGTSTP, SIG_IGN) != SIG_IGN) /*Disable the Ctrl-Z*/
+		signal(SIGTSTP, handle_SIGTSTP);
+	/* initialize the ctrl-Z flag*/
+	flagZ = 0;
 /*********************************************************************************************************/
 
 	char inputBuffer[MAX_LINE]; /* buffer to hold the command entered */
-	int background,status,flag; /* equals 1 if a command is followed by '&'; status to decide the child status */
+	int background,status; /* equals 1 if a command is followed by '&'; status to decide the child status */
 	char *args[MAX_LINE/+1]; /* command line (of 80) has max of 40 arguments */
 	pid_t fid; /* fid to recognize the parent/child process */
 	static int index; /* take record of how many command lines have been passed to the terminal*/
+	int Hindex = 0; /* History index */
+	jobs* MostRecent;
+
+/**********************************************************************************************************
+ * Set up a loop */
+	int a;
+	job[0].last = &job[4];
+	job[0].next = &job[1];
+	for(a = 1; a < (BG_LIMIT-1); a++){
+		job[a].last = &job[a-1];
+		job[a].next = &job[a+1];
+	}
+	job[4].last = &job[3];
+	job[4].next = &job[0];
+	MostRecent = &job[0];
+/*
+	for(a = 0; a <BG_LIMIT; a++){
+		printf("%d : the last address is %x, the present address is %x,the next address is %x\n",a,  job[a].last, &job[a], job[a].next);
+	}*/
+/*********************************************************************************************************/
 
 	index = 0;
-	flag = 0; /*Designed to avoid the calling of recording when first time enter */
-
 	while (1){ /* Program terminates normally inside setup */
 		background = 0;
 		printf(" COMMAND->\n");
 
-		if(background == 1){/*check if parent did not wait for child to finish*/
-			wait(&status); /* get the status of child process by using wait()*/
-		}
-		/* Use the status to check if the child process has a valid shell argument */
-		if(status == 0 && flag){ /* only when status == 0, the child run successfully*/
-			if(!strcmp(inputBuffer,"exit")){ // If the input has only exit, end child process
-				exit(0);
-			}
-			takenRecord(index, args, inputBuffer);/*After the command line was taken down, put it into histroy*/
-			index++; /*everytime a command line is passed, the index is incremented*/
-		}else{
-			flag = 1;
-		}
-
 		setup(inputBuffer, args, &background, index); /* get next command */
 
+		/* Take down all of the history record */
+		takenRecord(Hindex, args, inputBuffer, History, HISTORY_LIMIT);
+		Hindex++; /*everytime a command line is passed, the index is incremented*/
 		/* Invoke a fork process */
 		fid = fork();
 		/* If fid is zero, it is child process */
 		if(fid == 0){
+printf("The child process %d \n", getpid());
 			if(!strcmp(inputBuffer,"exit") && args[1] == NULL){ /* If the input has only exit, end child process */
 				exit(0);
 			}
@@ -217,30 +244,57 @@ int main(void)
 				int ret = chdir(args[1]); /* when the directory is wrong, ret = -1 */
 				exit(ret);
 			}
+			else if(!strcmp(inputBuffer,"jobs") && args[2] == NULL){
+				
+			}
+			else if(!strcmp(inputBuffer,"history") && args[1] == NULL){
+				int i;
+				for(i=0; i < HISTORY_LIMIT; i++)
+				{
+					int Indx = 0;
+					if(History[i].args[Indx] == NULL)  break;
+					printf("%d    ", History[i].index );
+					while(History[i].args[Indx] != NULL){
+						printf("%s ", History[i].args[Indx]);
+						Indx++;
+					}
+					printf("\n");
+				};
+			}
 			/* Test if the statement is valid, otherwise show the error message */
 			else if(execvp(inputBuffer, args) == -1){
-				printf("ERROE: The Command line is invalid\n");
+				printf("ERROR: The Command line is invalid\n");
 				exit(-1);
-			}else{/* After the process finished, kill it*/
-				exit(0);
 			}
+			/* After the process finished, kill it*/
+			exit(0);
 		}
 		/* If fid is positive, it is parent process */
 		else if(fid > 0){
+
+			childID = fid;
 			pid_t	tpid;
 			
 			/* Here check the background to see if we need to wait the child process to finish */
-			if(background){ /* when background = 0, parent process does its own work -- run cocurrently */
-				//tpid = wait(&status); /* get the status of child process by using wait()*/
+			if(background){ /* when background = 1, parent process does its own work -- run cocurrently */
+				MostRecent = MostRecent->next; /* set the MostRecent to next position*/
+				MostRecent->pid = fid; /* STORE the command into job */
 			}else{ /* otherwise, parent process waits for child process */
 
-				/* keep the while loop running when child signal is not terminated */
+				/* wait untill when child signal is not terminated */
 				do {
-					tpid = wait(&status);
-					if(tpid != fid) kill(tpid,0);
+					tpid = waitpid(fid, &status, WSTOPPED);
 				} while(tpid != fid);
+
+				if(flagZ) {
+					kill(fid, SIGCONT); /* Resume the child process at background*/
+					flagZ = 0;
+					MostRecent = MostRecent->next; /* set the MostRecent to next position*/
+					MostRecent->pid = fid; /* STORE the command into job */
+				}
 			}
 		}
+
 		/* otherwise, forking fails */
 		else{
 			printf("ERROR: forking child process failed\n");
@@ -252,17 +306,46 @@ int main(void)
 		(2) the child process will invoke execvp()
 		(3) if background == 1, the parent will wait,
 		otherwise returns to the setup() function. */
+
+		int   num = 1;
+		jobs* position = MostRecent;
+		/*check if the background process still exit*/
+		for(a =0; a<BG_LIMIT; a++){
+			position = position->last;
+printf("The position is %x \n", position);
+			printf("enter if statement with %d \n", waitpid(position->pid, &status, WNOHANG));
+			if(!waitpid(position->pid, &status, WNOHANG) && position->pid != 0)
+			{
+				position->index = num;
+				printf("The index is %d, The process %d is going\n",position->index, position->pid);
+				num++;
+			}else{
+				printf("The process %d has been end\n", position->pid);
+				position->pid = 0;
+				//position->index = 0;
+			}
+		}
+
+
+		/* Use the status to check if the child process has a valid shell argument */
+		if(status == 0 ){ /* only when status == 0, the child run successfully*/
+			if(!strcmp(inputBuffer,"exit")){ // If the input has only exit, end child process
+				exit(0);
+			}
+			takenRecord(index, args, inputBuffer, record, RECORD_LIMIT);/*After the command line was taken down, put it into histroy*/
+			index++; /*everytime a command line is passed, the index is incremented*/
+		}
 	}
 }
 
-void takenRecord(int index, char* args[],char inputBuffer[])
+void takenRecord(int index, char* args[],char inputBuffer[], history history[], int limit)
 {
-	 int ID = index % 10; /* once the index is 10, it will take the position of place 0 -- loop */
+	 int ID = index % limit; /* once the index is 10, it will take the position of place 0 -- loop */
 
 		/* the record take down all of the values of its variables*/
-		record[ID].index = index;
-		memcpy(record[ID].inputBuffer, inputBuffer, MAX_LINE); /* duplicate inputBUffer*/
-		positionCalculation( args, record[ID].args, &record[ID].inputBuffer[0]); /* calculate new memory location*/
+		history[ID].index = index;
+		memcpy(history[ID].inputBuffer, inputBuffer, MAX_LINE); /* duplicate inputBUffer*/
+		positionCalculation( args, history[ID].args, &history[ID].inputBuffer[0]); /* calculate new memory location*/
 }
 
 void positionCalculation(char* args[], char* argss[], char* input)
