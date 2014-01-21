@@ -10,37 +10,29 @@
 * using whitespace as delimiters. setup() sets the args parameter as a 
 * null-terminated string.
 */
-static int length;
-static int error = 0;
-static int q = 0; // index for history array
-static char* history[50][MAX_LINE];
-static RFlag = 0;
+int length;
+int error = 0, his = 0;
+int s = 0, q = 0, j = 0; // index for history array
+int RFlag = 0;
+char history[100][80];
+
 void setup(char inputBuffer[], char *args[],int *background){
 	//int length, /* # of characters in the command line */
 		int i, /* loop index for accessing inputBuffer array */
 		start, /* index where beginning of next command parameter is */
 		ct; /* index of where to place the next parameter into args[] */
-	ct = 0;
-
-
-	int s = 0;
-	for(s; s < length; s++){
-		//printf("%s \n",args[s]);
-		history[q][s] = args[s];
-		printf("History : %s\n",history[q][s] );
-		//printf("%s\n",inputBuffer );
-	}
-	 // 
-
-	// need to test the 2D array
-
-
-
+		ct = 0;
 	
-
-	//printf("History:  %s\n", inputBuffer);
 /* read what the user enters on the command line */
-	length = read(STDIN_FILENO, inputBuffer, MAX_LINE); 
+	if(his == 0){
+		length = read(STDIN_FILENO, inputBuffer, MAX_LINE); 
+	}
+	if(inputBuffer[i] != 'r'){
+		for (q = 99;q>0; q--){
+  			strcpy(history[q], history[q-1]);
+ 			strcpy(history[0],inputBuffer);
+ 		}
+ 	}
 	start = -1;
 	if (length == 0)
 		exit(0); /* ^d was entered, end of user command stream */
@@ -51,9 +43,15 @@ void setup(char inputBuffer[], char *args[],int *background){
 /* examine every character in the inputBuffer */
 		for (i=0;i<length;i++) { 
 			switch (inputBuffer[i]){
-				case'r':
-					RFlag = 1;
-				break;
+				case 'r':
+					if(inputBuffer[i+2] == 0){
+						RFlag = 1;
+						printf("RFlag: %d\n", RFlag);
+					}else{
+						RFlag = 2;
+						printf("RFlag: %d\n",RFlag );
+					}
+					break;
 				case ' ':
 				case '\t' :    /* argument separators */
 					if(start != -1){
@@ -83,48 +81,43 @@ void setup(char inputBuffer[], char *args[],int *background){
 						}
 			} 
 		} 
+		i = his;
 	args[ct] = NULL; /* just in case the input line was > 80 */
 } 
-int main(void){
 
+int main(void){
 	char inputBuffer[MAX_LINE]; /* buffer to hold the command entered */
 	int background; /* equals 1 if a command is followed by '&' */
 	char *args[MAX_LINE/+1];  /* command line (of 80) has max of 40 arguments */
 	pid_t childPID;
 	int i = 0;
 	int childStatus;
-
 	while (1){    /* Program terminates normally inside setup */
-	//printf("REPEAT\n");
-		q++;
+		int buffCount = 0;
 		background = 0;	
-		
 		printf(" COMMAND->\n");
 		setup(inputBuffer,args,&background); /* get next command */
-		// int s = 0;
-		// for(s; s < length; s++){
-		// 	printf("%s \n",args[s]);
-		// }
-		childPID = fork(); //(1) fork a child process using fork()
-		//printf("childPID = %d \n",childPID);
-
-
-		// if(RFlag == 1){
-		// 	RFlag = 0;
-		// 	//execvp(history[q-1][0],history[q-1]);
-		// 	printf("Worng Command\n");
-		// 	exit(0);
-		// }
-
-
-
-/* the steps are:
-
-(2) the child process will invoke execvp()
-(3) if background == 1, the parent will wait, 
-otherwise returns to the setup() function. */
-		// if fork fail
-		if(childPID < 0){
+		if(RFlag != 1 || RFlag != 2){
+			childPID = fork(); //(1) fork a child process using fork()
+		}
+		if(RFlag == 1){
+			RFlag = 0;
+			strcpy(inputBuffer, history[i]);
+ 			system(inputBuffer);  			
+		}else if (RFlag == 2){
+			RFlag = 0;
+			int a=0;
+			printf("BUF %s\n",&inputBuffer[2]);
+			printf("history 11 %s\n",&history[a][0]  );
+			// while(&history[a][0] != &inputBuffer[2]){
+			// 	a++;
+			// }
+			strcpy(inputBuffer, history[a]);
+ 			printf("buffer %s\n",inputBuffer);
+ 			printf("history %s\n",&history[a][0] );
+ 			system(history[a]);
+		}
+		else if(childPID < 0){
 			printf("System Fork Process Fail!!"); // print fail to fork
 			exit(1); // exit as fail
 		}
@@ -139,43 +132,14 @@ otherwise returns to the setup() function. */
 		}
 		else if(childPID > 0){ //Parent Process
 			if(background == 0){ // command end without & symbol
-				//wait(NULL);
-
 				pid_t currentID = wait(&childStatus);
 				while(currentID != childPID){
 					currentID = wait(&childStatus);
 					
 				}
 
-				//return childStatus;
-
 			}
 		}
-		// else{
-		// 	setup(inputBuffer,args,&background);
-		// }
-		// else{
-		// 	printf("IN ELSE\n");
-		// 	execvp(args[0], args);
-		// 	printf(" COMMAND->\n");
-		// 	setup(inputBuffer,args,&background);
-		// }
-		// else{
-		// 	printf("In else sector\n");
-		// 	setup(inputBuffer,args,&background); /* get next command */
-		// }	
-
-		// else if (childPID ==0){
-		// 	if(execvp(args[0], args) == -1){
-		// 		printf("Fail to execute command\n");
-		// 	}
-
-		// }
-		// else{
-		// 	if(background == 1){
-		// 		wait(NULL);
-		// 	}
-		// }
 		
 	}
 }
