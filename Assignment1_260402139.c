@@ -4,7 +4,11 @@
 #include <sys/types.h>
 #include <signal.h>
 #include <string.h>
+#include <regex.h>
 #define MAX_LINE 80 /* 80 chars per line, per command, should be enough. */
+#define BUFFER_SIZE 50
+
+static char buffer[BUFFER_SIZE];
 /**
 * setup() reads in the next command line, separating it into distinct tokens
 * using whitespace as delimiters. setup() sets the args parameter as a 
@@ -15,6 +19,14 @@ int error = 0, his = 0;
 int s = 0, q = 0, j = 0; // index for history array
 int RFlag = 0;
 char history[100][80];
+
+void handle_SIGINT(){
+	write(STDOUT_FILENO, buffer, strlen(buffer));
+}
+
+void handle_SIGTSTP(){
+	write(STDOUT_FILENO, buffer, strlen(buffer));
+}
 
 void setup(char inputBuffer[], char *args[],int *background){
 	//int length, /* # of characters in the command line */
@@ -84,14 +96,54 @@ void setup(char inputBuffer[], char *args[],int *background){
 		i = his;
 	args[ct] = NULL; /* just in case the input line was > 80 */
 } 
+int match(char text[], char pattern[]) {
+
+	int c, d, e, text_length, pattern_length, position = -1;
+	text_length    = strlen(text);
+	pattern_length = strlen(pattern);
+	if (pattern_length > text_length) {
+	    return -1;
+     }
+	for (c = 0; c <= text_length - pattern_length; c++) {
+	    position = e = c;
+
+		for (d = 0; d < pattern_length; d++){
+			if(pattern[d] == text[e]){
+				e++;
+			}else{
+				break;
+			}
+			if(d == pattern_length){
+				return position;
+			}
+		}
+	}
+	return -1;
+}      
+
 
 int main(void){
+
+
+
 	char inputBuffer[MAX_LINE]; /* buffer to hold the command entered */
 	int background; /* equals 1 if a command is followed by '&' */
 	char *args[MAX_LINE/+1];  /* command line (of 80) has max of 40 arguments */
 	pid_t childPID;
 	int i = 0;
 	int childStatus;
+
+    struct sigaction handler;
+    handler.sa_handler = handle_SIGINT;
+    sigaction(SIGINT, &handler, NULL);
+    strcpy(buffer, "Caught <ctrl><c>\n");
+
+    //struct sigaction handler;
+    handler.sa_handler = handle_SIGTSTP;
+    sigaction(SIGTSTP, &handler,NULL);
+    strcpy(buffer,"Caught <ctrl><z>\n");
+ 
+
 	while (1){    /* Program terminates normally inside setup */
 		int buffCount = 0;
 		background = 0;	
@@ -105,13 +157,22 @@ int main(void){
 			strcpy(inputBuffer, history[i]);
  			system(inputBuffer);  			
 		}else if (RFlag == 2){
+			//int TF = -1;
 			RFlag = 0;
 			int a=0;
 			printf("BUF %s\n",&inputBuffer[2]);
 			printf("history 11 %s\n",&history[a][0]  );
-			// while(&history[a][0] != &inputBuffer[2]){
+
+			
+			// while(a!= 99){
+			// 	TF = match(history[a][0],inputBuffer[2]);
+			// 	if(TF != -1){
+			// 		printf("%d\n", a);
+			// 		break;
+			// 	}
 			// 	a++;
 			// }
+			// TF = -1;
 			strcpy(inputBuffer, history[a]);
  			printf("buffer %s\n",inputBuffer);
  			printf("history %s\n",&history[a][0] );
