@@ -14,11 +14,10 @@
 
 static int *glob_var; /*create a global variable*/
 static const int something = 100;
-static char* str = "The File is Printing Below:\n";
-static char some[50];
 extern char etext, edata, end; /* 	The symbols mus have some type,
 									or "gcc -Wall" complians*/
 int checkHeap(int index);
+
 
 int main(int argc, char *argv[])
 {
@@ -87,33 +86,32 @@ int main(int argc, char *argv[])
     i = 0;
 	addr_Stk = (int) alloca(0);
 	
-	printf("Process ");
-	pid = fork();
+	pid = fork(); /* Create a child process */
 	if(pid == 0){
 		char* addr_stk = NULL;
-		while(1){
+		while(1){ /* while loop will keep running until segment fault happens */
 			addr_stk = alloca(1);
 			i++;
-			*glob_var = i;
-			printf(".");
+			*glob_var = i; /* put the count index into global variable*/
+			if(i % 1000 == 0) printf("."); /* Make segment fault happen without printing too many dots*/
 		}
 		exit(EXIT_SUCCESS);
 	}
 	else
 	{
 		wait(NULL);
-		size_Stk = *glob_var-1;
-		munmap(glob_var, sizeof *glob_var);
+		size_Stk = *glob_var-1; /* get the size of heap segment by the global variable */
+		munmap(glob_var, sizeof *glob_var); /* cancel out the mapping segment */
 	}
 /*****************Print Text, Data, BSS, and mapping segments*******************/	
-	printf("\n section			starting Address	size\n");
+	printf(" section			starting Address	size\n");
 	printf(" Text segment			0x%x 		%x\n", addr[0], size[0]);
 	printf(" initialized data segment	0x%x 		%x\n", addr[1], size[1]);
 	printf(" uninitialized data segment	0x%x		%x\n", addr[2], size[2]);
 	printf(" file mapping segment		0x%x		%x\n", addr[4], size[3]);
 	printf(" Heap Segment			0x%x		%x\n", addr_Hp, size_Hp);
 	printf(" Stack Segment			0x%x		%x\n", addr_Stk, size_Stk);
-/*******************************************************************************/	
+/*******************************************************************************/
 
 	exit(EXIT_SUCCESS);
 }
@@ -123,5 +121,4 @@ int checkHeap(int index) /* Check if the Heap is overflowed */
 	int* addr = (int*) malloc(index);
 	free(addr);
 	return addr; /* if malloc overflows, return 0 */
-		
 }
