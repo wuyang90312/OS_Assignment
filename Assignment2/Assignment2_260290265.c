@@ -5,16 +5,18 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/mman.h>	
 #include <sys/types.h>	 
-#include <sys/stat.h>	
+#include <sys/stat.h>
+#include <sys/wait.h>	
 #include <fcntl.h>	
 #include <alloca.h>
 #include <signal.h>
 
 static int *glob_var; /*create a global variable*/
 static const int something = 100;
-extern char etext, edata, end; /* 	The symbols mus have some type,
+extern char etext, edata, end, _start, data_start; /* 	The symbols mus have some type,
 									or "gcc -Wall" complians*/
 int checkHeap(int index);
 
@@ -24,19 +26,19 @@ int main(int argc, char *argv[])
 /*********************************************************************************************************/
 	pid_t pid;
 	int addr[5], size[4]; /* Find all of four points and three sizes in between text, data, bss, File Mapping segments */
-	int addr_Stk, size_Stk, addr_Hp, size_Hp; /* Define varaibles for addresses and sizes of Stack and Heap */
+	int *addr_Stk, size_Stk, *addr_Hp, size_Hp; /* Define varaibles for addresses and sizes of Stack and Heap */
 	int addition = 0x10000000; /* set up the addition value to a large number*/
 
 /*****************Text, Data, BSS segments***************************************/	
 	/* Take record of every single point at each end of each segment*/
-	addr[0] = (int) &main; /* Here, Assume the address of the main is the starting point of the text segment*/
+	addr[0] = (int) &_start; /* Here, Assume the address of the main is the starting point of the text segment*/
 	addr[1] = (int) &etext;
 	addr[2] = (int) &edata;
 	addr[3] = (int) &end;
 
 	/* Take record of the sizes of three segments*/
 	size[0] = addr[1] - addr[0]; /* An important assumption: three segments are adjacent*/
-	size[1] = addr[2] - addr[1];
+	size[1] = addr[2] - (int)&data_start;
 	size[2] = addr[3] - addr[2];
 	
 /*************************** Process the file, get the File Mapping Segment ************************/
@@ -68,7 +70,7 @@ int main(int argc, char *argv[])
 /*****************Heap and Stack segments***************************************/	
 	/*Get the starting point of the Stack*/
 	int	i = 0;
-	addr_Hp = (int) malloc(0);
+	addr_Hp =  malloc(0);
 	while(addition != 1){ /* once if addition reaches 1, stop while loop */
 		if(!checkHeap(i)) /* once malloc overflows, reduce the addition value by a factor of 2 */
 		{
@@ -84,13 +86,12 @@ int main(int argc, char *argv[])
                     MAP_SHARED | MAP_ANONYMOUS, -1, 0); /* create a global varibles between two processes*/
     *glob_var = 1;
     i = 0;
-	addr_Stk = (int) alloca(0);
+	addr_Stk = alloca(0);
 	
 	pid = fork(); /* Create a child process */
 	if(pid == 0){
-		char* addr_stk = NULL;
 		while(1){ /* while loop will keep running until segment fault happens */
-			addr_stk = alloca(1);
+			addr_Stk = alloca(1);
 			i++;
 			*glob_var = i; /* put the count index into global variable*/
 			if(i % 1000 == 0) printf("."); /* Make segment fault happen without printing too many dots*/
@@ -109,8 +110,8 @@ int main(int argc, char *argv[])
 	printf(" initialized data segment	0x%x 		%x\n", addr[1], size[1]);
 	printf(" uninitialized data segment	0x%x		%x\n", addr[2], size[2]);
 	printf(" file mapping segment		0x%x		%x\n", addr[4], size[3]);
-	printf(" Heap Segment			0x%x		%x\n", addr_Hp, size_Hp);
-	printf(" Stack Segment			0x%x		%x\n", addr_Stk, size_Stk);
+	printf(" Heap Segment			0x%x		%x\n", (int)addr_Hp, size_Hp);
+	printf(" Stack Segment			0x%x		%x\n", (int)addr_Stk, size_Stk);
 /*******************************************************************************/
 
 	exit(EXIT_SUCCESS);
@@ -120,5 +121,5 @@ int checkHeap(int index) /* Check if the Heap is overflowed */
 {
 	int* addr = (int*) malloc(index);
 	free(addr);
-	return addr; /* if malloc overflows, return 0 */
+	return (int)addr; /* if malloc overflows, return 0 */
 }
