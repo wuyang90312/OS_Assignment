@@ -8,9 +8,16 @@
 
 #define EXIT_SUCCESS 0 
 
-void* ClientFunc()
+void* ClientFunc(void* args) /* once the function is called, start a new printing assignment */
 {
-	printf("The output is added\n");
+	char* s = (char*) args;
+	printf("The output is %s\n", s);
+}
+
+void* PrintFunc(void* args) /* once the function is called, start the printing task */
+{
+	char* s = (char*) args;
+	printf("The printer is %s\n", s);
 }
 
 int main()
@@ -23,18 +30,24 @@ int main()
 	int count;
 	for(count = 0; count < 5; count++)
 	{
-		sign = pthread_create(&client[count], NULL, ClientFunc, NULL);
+		sign = pthread_create(&client[count], NULL, ClientFunc, NULL); /* create thread for client */
 		if(sign != 0) /* once the creation is fail, return no zero number, print out the failure */
 			exit(sign);
 			
-		sign = pthread_join(client[count], NULL);
+		sign = pthread_join(client[count], NULL); /* Joint all of the thread together*/
 		if(sign != 0)
 			exit(sign);
 	}
 	
 	for(count = 0; count < 2; count++)
 	{
-		printf("hello, enter the loop %d", count);
+		sign = pthread_create(&printer[count], NULL, PrintFunc, NULL); /* create thread for client */
+		if(sign != 0) /* once the creation is fail, return no zero number, print out the failure */
+			exit(sign);
+			
+		sign = pthread_join(printer[count], NULL); /* Joint all of the thread together*/
+		if(sign != 0)
+			exit(sign);
 	}
 
 	return EXIT_SUCCESS; /* once everything work fine, exit with return 0*/
