@@ -9,46 +9,72 @@
 #include <semaphore.h>
 
 #define EXIT_SUCCESS 0
+#define CLIENT_CLASS 0
+#define PRINTER_CLASS 1
 
 static int file[7]; /* memory buffer */
-static int index, indexP;
-sem_t mutex, memLock;
+static int index, indexP, Process;
+sem_t mutex, Empty, Full; /* declare the semaphore as global variables*/
 
-int monitor(int ID) /* monitor session: used for synchronization*/
+int monitor(int class, int* ID) /* monitor session: used for synchronization*/
 {
-	sem_wait(&mutex);  /* lock the critical session */
-	ID++; /* when increment count, add a mutex */
-	sem_post(&mutex); /* unlock the critical session */
-	return ID;
+	
+	if(class == CLIENT_CLASS) /* if clients enter the monitor */
+	{
+		sem_wait(&mutex); /* lock the critical session */
+		index++; /* client index */
+		*ID = index%7;
+		sem_post(&mutex); /* unlock the critical session */
+		
+		sem_wait(&Empty);	/*First check if there is empty space*/
+							/*If there is, keep going; wait otherwise*/
+	}else if(class == PRINTER_CLASS) /* if printers enter the monitor */
+	{
+		sem_wait(&mutex); 
+		indexP++; /* printer index */
+		*ID = indexP%7;
+		sem_post(&mutex);
+		
+		sem_wait(&Full);	/*First check if there is loaded data*/
+							/*If there is, keep going; wait otherwise*/
+	}else /* unknown cases*/
+	{
+		printf("Error: Unknown Class Identification!!!!");
+		exit(EXIT_FAILURE);
+	}
+
+	return 0;
 }
 
 void* ClientFunc(void* args) /* once the function is called, start a new printing assignment */
 {
-	char s[5];
-	strcpy(s, (char*)args);
-	sem_post(&memLock); /* once the string is copied, release the memory*/
-	index = monitor(index);
-	int random = rand()%10 + 1; /* generate a random number from 1 to 10*/
-	
-	file[index-1] = random;
+	int i;
+	for(i = 0; i<3; i++){
+		int ID;
+		monitor(CLIENT_CLASS, &ID);
+		int random = rand()%10 + 1; /* generate a random number from 1 to 10*/
+		
+		file[ID] = random;
 
+		printf("The client%s stores %d to queue %d\n", (char*) args, file[ID], ID);
+		sem_post(&Full); /* Once a data is stored, signal full to increment*/
+	}
 	
-	printf("The output -%s- is %d : %d\n ", s, index-1, file[index-1]);
-	
+	Process++;/*Once client finished upload, signal the program*/
 	pthread_exit(0); /* exit thread */
 
 }
 
 void* PrintFunc(void* args) /* once the function is called, start the printing task */
 {
-	char s[5];
-	strcpy(s, (char*)args);
-	sem_post(&memLock); /* once the string is copied, release the memory*/
-printf("enter\n");
-	int ID = monitor(indexP);
-	sleep(file[indexP]);
-	printf("The printer is %s: %d\n", s, file[ID-1]);
-
+	int ID;
+	while(Process != 5 || index != indexP)
+	{
+		monitor(PRINTER_CLASS, &ID);
+		printf("The printer%s  prints %d frome queue %d\n", (char*)args, file[ID], ID);
+		sleep(file[ID]);
+		sem_post(&Empty); /* Once a data is printed, signal empty to increment*/
+	}
 	pthread_exit(0); /* exit thread */
 }
 
@@ -62,10 +88,12 @@ int main()
 	
 	sem_init(&mutex, 0, 1);		/* initialize mutex to 1 - binary semaphore */
 								/* second param = 0 - semaphore is local */
-	sem_init(&memLock, 0, 1);
-	printf("The mutex is %d\n", mutex);
-	index = 0; /* Initialize the index for thread */
-	indexP = 0;
+	sem_init(&Empty, 0, 7);
+	sem_init(&Full, 0, 0);
+	
+	index = -1; /* Initialize the index for thread */
+	indexP = -1;
+	Process = 0;
 	
 	sign = pthread_attr_init(&attr); /* Intialize the thread attribute*/
 	if(sign != 0)
@@ -75,42 +103,41 @@ int main()
 	if(sign != 0)
 		exit(sign);
 	
-	/* create two while loops: one for client, the other for printer */
-	int count;
-	for(count = 0; count < 5; count++)
-	{
-		printf("the number is %d and the memlock is %d\n", count, memLock);
-		char tmp[5];
-		sem_wait(&memLock); /* Make sure that only one thread access shared memory each time */
-		sprintf(tmp, "%d", count);
+	/* create client threads */
+
+	sign = pthread_create(&client[0], &attr, ClientFunc, "1"); /* create thread for client */
+	if(sign != 0) /* once the creation is fail, return no zero number, print out the failure */
+		exit(sign);
+	sign = pthread_create(&client[1], &attr, ClientFunc, "2"); /* create thread for client */
+	if(sign != 0) /* once the creation is fail, return no zero number, print out the failure */
+		exit(sign);
+	sign = pthread_create(&client[2], &attr, ClientFunc, "3"); /* create thread for client */
+	if(sign != 0) /* once the creation is fail, return no zero number, print out the failure */
+		exit(sign);
+	sign = pthread_create(&client[3], &attr, ClientFunc, "4"); /* create thread for client */
+	if(sign != 0) /* once the creation is fail, return no zero number, print out the failure */
+		exit(sign);
+	sign = pthread_create(&client[4], &attr, ClientFunc, "5"); /* create thread for client */
+	if(sign != 0) /* once the creation is fail, return no zero number, print out the failure */
+		exit(sign);
+
+	/* create printer threads */
+
+	sign = pthread_create(&printer[0], &attr, PrintFunc, "1"); /* create thread for client */
+	if(sign != 0) /* once the creation is fail, return no zero number, print out the failure */
+		exit(sign);
 		
-		sign = pthread_create(&client[count], &attr, ClientFunc, tmp); /* create thread for client */
-		if(sign != 0) /* once the creation is fail, return no zero number, print out the failure */
-			exit(sign);
+	sign = pthread_create(&printer[1], &attr, PrintFunc, "2"); /* create thread for client */
+	if(sign != 0) /* once the creation is fail, return no zero number, print out the failure */
+		exit(sign);
 
-		/*sign = pthread_join(client[count], NULL); /* Joint all of the thread together*/
-		/*if(sign != 0)
-			exit(sign);*/
-	}
+	while(Process != 5 || index != indexP)
+		sleep(1);
+	printf("Finish successfully\n");
 
-
-	for(count = 0; count < 2; count++)
-	{
-		printf("2. the number is %d and the memlock is %d, the index is %d\n", count, memLock, index);
-		char tmp[5];
-		sem_wait(&memLock); /* Make sure that only one thread access shared memory each time */
-		sprintf(tmp, "%d", count);
-
-		sign = pthread_create(&printer[count], &attr, PrintFunc, tmp); /* create thread for client */
-		if(sign != 0) /* once the creation is fail, return no zero number, print out the failure */
-			exit(sign);
-			
-	}
-	sleep(20);
-	printf("finish successfully\n");
-
-	sem_destroy(&memLock); /* destroy semaphore */
-	sem_destroy(&mutex);
+	sem_destroy(&mutex); /* destroy semaphore */
+	sem_destroy(&Empty);
+	sem_destroy(&Full);
 	
 	return EXIT_SUCCESS; /* once everything work fine, exit with return 0*/
 }
