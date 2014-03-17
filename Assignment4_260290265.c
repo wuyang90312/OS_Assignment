@@ -14,10 +14,11 @@
 static int threadNum, resourceType;
 static int *globalCond;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;	
 
 /*
  *********************Declaration of all the classes********************/
-int Banker();
+int Banker(int,int);
 void* threadCreation(void*);
 int allocateResources(int, int*);
  /*
@@ -46,9 +47,7 @@ int main(int arg, char* argv[]) /* Todo: to finishe the assignment, add more typ
 			return EXIT_FAILURE;
 		}
 	}
-	
-	printf("the resources are %d  %d  %d \n", globalCond[0],globalCond[1],globalCond[2]);
-	
+
 /*************************Initialize the global variables********************************/
 	threadNum = atoi(argv[2]);
 	if(!threadNum)
@@ -87,9 +86,14 @@ int main(int arg, char* argv[]) /* Todo: to finishe the assignment, add more typ
 	return EXIT_SUCCESS;
 }
 
-int Banker() /*Now Assume that the resource is only one type; TODO: accomodate with multiple resources*/
+int Banker() /*The whole section is set as a critical session so that only one process can access the Banker at the same time*/
 {
-	 return EXIT_SUCCESS;
+	rc = pthread_mutex_lock(&mutex);
+	printf("the resources are %d  %d  %d \n", globalCond[0],globalCond[1],globalCond[2]);
+	
+	
+	rc = pthread_mutex_unlock(&mutex);
+	return EXIT_SUCCESS;
 }
 
 void* threadCreation(void* args) /*Now Assume that the resource is only one type; TODO: accomodate with multiple resources*/
@@ -97,11 +101,14 @@ void* threadCreation(void* args) /*Now Assume that the resource is only one type
 	 if(!strcasecmp(AVOIDANCE,(char*) args))
 	 {
 		 printf("start to use banker's algorithm\n");
-		 if(!Banker)
+		 if(Banker(0,1))
 		{
 			fprintf(stderr, "ERROR: Failure of Banker's Algorithm!!!\n");
 			pthread_exit(0); /* exit thread */
 		}
+	 }else
+	 {
+		 printf("start to use detection algorithm\n");
 	 }
 	 pthread_exit(0); /* exit thread */
  }
