@@ -34,9 +34,10 @@ int processlimit[4][3] ={{4,4,4},{4,4,4},{4,4,4},{4,4,4}};
  *********************Declaration of all the classes********************/
 void* threadCreation(void*);
 void sleepProcess();
- void globalCondModify(int, int, int);
+void globalCondModify(int, int, int);
 int checkSafty();
 int Banker(int, int,int);
+int detection(int, int, int);
 int resourceRequest(int, int, int, int);
 int allocateResources(int, int*);
  /*
@@ -169,6 +170,11 @@ int checkSafty()
 	return FAILURE;
 }
 
+int detection(int currentprocess, int type, int resource)
+{
+    
+}
+
 void* threadCreation(void* args) /*Now Assume that the resource is only one type; TODO: accomodate with multiple resources*/
  {
 	 int algorithm, currentprocess,rc, resourceT, content, type[resourceType], resource[resourceType];
@@ -216,10 +222,11 @@ void* threadCreation(void* args) /*Now Assume that the resource is only one type
 	{
 		int seed = time(NULL);
 		srand(seed);
-		resourceT = rand()%resourceType;
+		
 		content = 0;
 		while(!content)
 		{
+            resourceT = rand()%resourceType;
 			content = rand()%processCond[resourceT]+1;
 		}
 		if(!resourceRequest(currentprocess, algorithm, resourceT, resource[2]))
@@ -245,12 +252,12 @@ void* threadCreation(void* args) /*Now Assume that the resource is only one type
  int resourceRequest(int currentprocess, int algorithm, int type, int resource)
  {
 	 if(algorithm){
-		
+		detection(currentprocess, type, resource);
 	 }else
 	 {
 		 while(!Banker(currentprocess, type, resource))
 		{
-			//printf(" The %d-%d is stuck for signal \n", currentprocess, type);
+			printf(" The %d-%d is stuck for signal \n", currentprocess, type);
 			pthread_cond_wait(&cond, &mutexCOND);
 			pthread_mutex_unlock(&mutexCOND);
 			
