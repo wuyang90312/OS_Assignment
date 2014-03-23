@@ -18,8 +18,8 @@
 #define TRUE		1
 
 static int threadNum, resourceType, process, processTime;
-static int *globalCond;
-static int *processCond;
+static int *globalCond; /* Available resources */
+static int *processCond; /* The resources hold by each process */
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t mutexNUM = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t mutexCOND = PTHREAD_MUTEX_INITIALIZER;
@@ -36,6 +36,7 @@ void* threadCreation(void*);
 void sleepProcess();
 void globalCondModify(int, int, int);
 int checkSafty();
+int checkDeadLock(int, int);
 int Banker(int, int,int);
 int detection(int, int, int);
 int resourceRequest(int, int, int, int);
@@ -47,7 +48,6 @@ int main(int arg, char* argv[]) /* Todo: to finishe the assignment, add more typ
 {
 	int sign, loop, tmp;
 	pthread_attr_t attr;
-
 /******************Check the states of arguments & Initialize the global variables************/	
 	if(arg < 5) /*If the argument is less than 4, the argument is not enough*/
 	{
@@ -56,7 +56,6 @@ int main(int arg, char* argv[]) /* Todo: to finishe the assignment, add more typ
 	}
 
 	resourceType = arg-4; /* Intialize the condition variables*/
-	globalCond = malloc(resourceType*sizeof(int));
 	for(loop = 3; loop < arg-1;  loop++)
 	{
 		globalCond[loop-3] = atoi(argv[loop]); /* Allocate different resources */
@@ -113,7 +112,7 @@ int main(int arg, char* argv[]) /* Todo: to finishe the assignment, add more typ
 		if(sign != 0) /* once the creation is fail, return no zero number, print out the failure */
 			exit(sign);
 	}
-	printf("2 succuess\n"); //todo: clean up the sentence
+
 	sleep(processTime);
 	return EXIT_SUCCESS;
 }
@@ -125,7 +124,6 @@ int Banker(int currentprocess, int type, int resource) /*The whole section is se
 	printf("The %d-%d\t", currentprocess, type);
 	printf("1. the resources are %d  %d  %d \t", globalCond[0],globalCond[1],globalCond[2]);
 	
-	//globalCond[type] -= resource;
 	globalCondModify(MINUS,resource,type);
 	processCond[currentprocess*resourceType+type] -=resource;
 	
@@ -151,9 +149,8 @@ int checkSafty()
 	{
 		if(globalCond[loop%resourceType] >= processCond[loop])
 		{
-			//printf("%d >= %d\t", globalCond[loop%resourceType], processCond[loop]);
 			succession ++;
-			if(succession == 3)
+			if(succession == resourceType)
 			{
 				return SUCCESS;
 			}
@@ -170,9 +167,65 @@ int checkSafty()
 	return FAILURE;
 }
 
-int detection(int currentprocess, int type, int resource)
+int detection(int currentprocess, int type, int resource) /* Used to check if deadlock ever occurs, if so kill the deadlock */
 {
-    
+	int rc, loop, deadLock;
+	deadLock = 0;
+	rc = pthread_mutex_lock(&mutex);
+	printf("The %d-%d\t", currentprocess, type);
+	printf("1. the resources are %d  %d  %d \t", globalCond[0],globalCond[1],globalCond[2]);
+	
+	if(processCond[currentprocess*resourceType+type] >= resource)
+	{
+		globalCondModify(MINUS,resource,type);
+		processCond[currentprocess*resourceType+type] -= resource;
+		deadLock = 1;
+	}
+	else /* if the resource is not enough, check if the deadlock occurs*/
+	{
+		deadLock = checkDeadLock(type,resource); /* check the safty of the resources*/
+		if(deadLock == 1) /* if there is a deadlock, kill one deadlock process*/
+			printf(" There is a deadlock");
+	}
+	
+	printf("2. the resources are %d  %d  %d --> %d\n", globalCond[0],globalCond[1],globalCond[2],deadLock);
+	rc = pthread_mutex_unlock(&mutex);
+	return deadLock;
+}
+
+int checkDeadLock(int type, int resource)
+{
+	int loop, succession, quotient; 
+	loop = 0;
+	succession = 0;
+
+	while(loop < resourceType*threadNum)
+	{
+		if(globalCond[loop%resourceType] >= processCond[loop])
+		{
+			succession ++;
+			if(succession == resourceType)
+			{
+				if((processCond[loop + type - resourceType]+ globalCond[type]) >= resource)
+				{
+					return FAILURE; /* There is no deadlock*/
+				}
+				else
+				{
+					succession = 0;
+				}
+			}
+			loop ++;
+		}else
+		{
+			succession = 0;
+			quotient = (int) (loop / resourceType);
+			loop = (quotient+1)*resourceType;
+		}
+			
+	}
+	
+	return SUCCESS; /*There is a deadlock*/
 }
 
 void* threadCreation(void* args) /*Now Assume that the resource is only one type; TODO: accomodate with multiple resources*/
@@ -192,7 +245,7 @@ void* threadCreation(void* args) /*Now Assume that the resource is only one type
 	 {
 		 algorithm = 1;
 	 }
-	/* sleepProcess();
+	 sleepProcess();
 	 type[0] = 0;
 	 resource[0] = processlimit[currentprocess][0];
 	 if(!resourceRequest(currentprocess, algorithm, type[0], resource[0]))
@@ -215,10 +268,10 @@ void* threadCreation(void* args) /*Now Assume that the resource is only one type
 	 {
 		fprintf(stderr, "ERROR: Failure of Resource Allocation!!!\n");
 		pthread_exit(0);
-	 }*/
+	 }
 
 	/* keeping the thread running until program terminate itself */
-	while(TRUE)
+	/*while(TRUE)
 	{
 		int seed = time(NULL);
 		srand(seed);
@@ -236,36 +289,42 @@ void* threadCreation(void* args) /*Now Assume that the resource is only one type
 		}
 		sleepProcess();
 		
-		globalCondModify(PLUS, content, resourceT);
-		pthread_cond_broadcast(&cond); /* once resource are released, wake up all the sleeping threads*/
-		printf("%d sucessfully start to signal, resource: %d %d %d \n", currentprocess,globalCond[0],globalCond[1],globalCond[2]);
-	}
+		globalCondModify(PLUS, content, resourceT);*/
+		//pthread_cond_broadcast(&cond); /* once resource are released, wake up all the sleeping threads*/
+		//printf("%d sucessfully start to signal, resource: %d %d %d \n", currentprocess,globalCond[0],globalCond[1],globalCond[2]);
+	//}
 
-	/* globalCond[0] += resource[0];
+	 globalCond[0] += resource[0];
 	 globalCond[1] += resource[1];
-	 globalCond[2] += resource[2];*/
-	// pthread_cond_broadcast(&cond); /* once resource are released, wake up all the sleeping threads*/
+	 globalCond[2] += resource[2];
+	 pthread_cond_broadcast(&cond); /* once resource are released, wake up all the sleeping threads*/
 	 //printf("%d sucessfully start to signal, resource: %d %d %d \n", currentprocess,globalCond[0],globalCond[1],globalCond[2]);
 	 pthread_exit(0); /* exit thread */
  }
  
- int resourceRequest(int currentprocess, int algorithm, int type, int resource)
- {
+int resourceRequest(int currentprocess, int algorithm, int type, int resource)
+{
 	 if(algorithm){
-		detection(currentprocess, type, resource);
+		printf("This is detection algorithm\n");
+		while(!detection(currentprocess, type, resource))
+		{
+			printf(" The %d-%d is stuck for signal \n", currentprocess, type);
+			pthread_cond_wait(&cond, &mutexCOND);
+			pthread_mutex_unlock(&mutexCOND);
+		}
 	 }else
 	 {
-		 while(!Banker(currentprocess, type, resource))
+		while(!Banker(currentprocess, type, resource))
 		{
 			printf(" The %d-%d is stuck for signal \n", currentprocess, type);
 			pthread_cond_wait(&cond, &mutexCOND);
 			pthread_mutex_unlock(&mutexCOND);
 			
 		}
-	 }
+	}
 
-	 return SUCCESS;
- }
+	return SUCCESS;
+}
  
  void globalCondModify(int type, int content, int index) /* Make sure that only one process modify the global variable each time*/
  {
