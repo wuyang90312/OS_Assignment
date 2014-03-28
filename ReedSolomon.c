@@ -14,6 +14,7 @@ int Generator[5] = {1,15,3,1,12}; /* TODO:turn it to a function based on Generat
 #define DERIVATIVE	14
 
 void AddErrors(int*);
+int squeeZero(int*, int*, int);
 int Division(int, int*, int*, int);
 int power(int, int);
 int ReedSolomonEncoding(int[], int*, int);
@@ -66,8 +67,18 @@ int main(){
 		}
 		syndrome[index] ^=  EncodedCode[loop];
 	}
+	int* syndrome2,size2;
+	size2 = squeeZero(syndrome,syndrome2, size);
+	else if(size2 < size)
+	{
+		//size = size2;
+		memset(syndrome, 0, sizeof(int)*size2);
+		memcpy(syndrome, syndrome2,sizeof(int)*size2);
+	}
+
+
 	printf(" The syndrome polynomials is: ");
-	for(loop = 0; loop < size; loop++)
+	for(loop = 0; loop < size2; loop++)
 	{
 		printf(" %d ", syndrome[loop]);
 	}
@@ -84,11 +95,17 @@ int main(){
 	quotient = malloc(2*sizeof(int));
 	location[0] =1;
 
-	fd = GFModula(location, syndrome,result, size, quotient, 1);
+	fd = GFModula(location, syndrome,result, size, quotient, 2);
 	printf(" The first quotient is: ");
 	for(loop = 0; loop <2; loop++)
 	{
 		printf("  %d  ", quotient[loop]);
+	}
+	
+	printf("  the first residu is:");
+	for(loop = 0; loop <fd; loop++)
+	{
+		printf("  %d  ", location[size+1-fd+loop]);
 	}
 	printf("\n");
 	
@@ -178,7 +195,7 @@ int main(){
 /*********************The End of Section of Error Location***********************/	
 
 /*********************The Section of Error Correction****************************/
-	int derivative = DERIVATIVE;
+	int derivative = factor1[0];//DERIVATIVE;
 	int dividerivative = Division(1, &derivative,NULL, 0);
 	for(loop = 0; loop<GFLENGTH; loop++)
 	{
@@ -235,7 +252,7 @@ int power(int a, int b)
 
 void AddErrors(int* msg) /* Later we add some random error at random positions */
 {
-	msg[5] = msg[5]^13;
+	msg[5] = msg[5]^7;
 	msg[12] = msg[12]^2;
 }
 
@@ -390,4 +407,31 @@ int Location(int number)/* Target the index of each number: N = a^m, to get m*/
 			break;
 	}
 	return (loop-1);
+}
+
+int squeeZero(int* number, int* value, int size)
+{
+	int RealSize, mark;
+	mark = 0;
+	if(number[0] != 0)
+		return size;
+		
+	for(RealSize = size; RealSize>0; RealSize --)
+	{
+		if(mark == 0 && number[size-RealSize]==0)
+		{
+		}
+		else if(mark == 0 && number[size-RealSize]!=0)
+		{
+			mark = RealSize;
+			*value = malloc(RealSize*sizeof(int));
+			value[0] = number[size-RealSize];
+		}
+		else
+		{
+			value[mark-RealSize] = number[size-RealSize];
+		}
+	}
+
+	return mark;
 }
